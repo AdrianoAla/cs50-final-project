@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+
+{% block title %} Categories {% endblock %}
+
+{% block content %}
+    <script>
+        function addOption() {
+            var optionsDiv = document.getElementById("options-div");
+            var optionInput = document.createElement("input");
+            optionInput.type = "text";
+            optionInput.name = "options";
+            var br = document.createElement("br");
+            optionsDiv.appendChild(optionInput);
+            optionsDiv.appendChild(br);
+        }
+    </script>
+    <!-- form -->
+    <form action="/create" method="POST">
+        <label for="title">Title</label>
+        <input type="text" name="title" id="title">
+        
+        <select name="category">
+            {% for category in categories %}
+                <option value="{{category}}">{{category}}</option>
+            {% endfor %}
+        </select>
+        <br/>
+
+        <input type="date" name="expires_date">
+        <input type="time" name="expires_time">
+        <br/>
+        
+        <label for="options">Options</label>
+        <br/>
+        
+        <div id="options-div"></div>
+        
+        <input type="button" value="Add Option" onclick="addOption()">
+        <input type="submit" value="Create">
+    </form>
+{% endblock %}

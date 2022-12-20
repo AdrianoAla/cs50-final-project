@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+
+{% block title %} Search {% endblock %}
+
+{% block content %}
+    <h1>Search</h1>
+    <form action="/search" method="POST">
+        <input type="text" name="query" id="query">
+        <select name="category">
+            {% for category in categories %}
+                <option value="{{category}}">{{category}}</option>
+            {% endfor %}
+        </select>
+        <input type="submit" value="Search">
+    </form>
+
+    {% for poll in polls %}
+        <div class="poll">
+            <h2><a href="/poll/{{poll[0]}}">{{poll[1]}}</a></h2>
+        </div>
+    {% endfor %}
+{% endblock %}

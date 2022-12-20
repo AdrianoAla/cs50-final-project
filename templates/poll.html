@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+
+{% block title %} Poll {% endblock %}
+
+{% block content %}
+    <h1>{{poll[1]}} | {{votes}}</h1>
+    <p>{{poll[2]}}</p>
+    {% if closed %}
+        <p>Poll is closed.</p>
+    {% else %}
+        <form action="/poll/{{poll[0]}}" method="POST">
+            
+            {% if voted == None %}
+            <select name="option" >
+                {% for option in options %}
+                    <option value="{{option[0]}}">{{option[2]}}</option><br/>
+                {% endfor %}
+            </select>
+            <input type="submit" value="Vote">
+            {% else %}
+                {% for option in options %}
+                
+                    {% if option[0] == voted %}
+                        <h2>Already voted for {{option[2]}}</h2>
+                    {% endif %}
+
+                {% endfor %}
+            {% endif %}
+        </form>
+    {% endif %}
+    {% if creator and not closed %}
+        <form action="/delete/{{poll[0]}}" method="POST">
+            <input type="submit" value="Delete">
+        </form>
+        <form action="/end/{{poll[0]}}" method="POST">
+            <select name="win" >
+                {% for option in options %}
+                    <option value="{{option[0]}}">{{option[2]}}</option><br/>
+                {% endfor %}
+            </select>
+            <input type="submit" value="End">
+        </form>
+    {% endif %}
+{% endblock %}
