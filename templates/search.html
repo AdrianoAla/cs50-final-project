@@ -3,15 +3,29 @@
 {% block title %} Search {% endblock %}
 
 {% block content %}
+    <nav>
+        <a href="/create">Create Poll</a>
+        <a href="/search">Search Polls</a>
+        {% if uid %}
+            <a href="/users/{{uid}}">My Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+        {% endif %}
+    </nav>
+    <main>
     <h1>Search</h1>
-    <form action="/search" method="POST">
-        <input type="text" name="query" id="query">
-        <select name="category">
-            {% for category in categories %}
-                <option value="{{category}}">{{category}}</option>
-            {% endfor %}
-        </select>
-        <input type="submit" value="Search">
+    <form action="/search" method="GET">
+        <div class="search-form">
+            <input class="search-input" type="text" name="query" id="query">
+            <select name="category">
+                {% for category in categories %}
+                    <option value="{{category}}">{{category}}</option>
+                {% endfor %}
+            </select>
+            <input type="submit" value="Search">
+        </div>
     </form>
 
     {% for poll in polls %}
@@ -19,4 +33,5 @@
             <h2><a href="/poll/{{poll[0]}}">{{poll[1]}}</a></h2>
         </div>
     {% endfor %}
+    </main>
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %} Categories {% endblock %}
+{% block title %} Create a Poll {% endblock %}
 
 {% block content %}
     <script>
@@ -9,33 +9,63 @@
             var optionInput = document.createElement("input");
             optionInput.type = "text";
             optionInput.name = "options";
+            optionInput.className = "option"
             var br = document.createElement("br");
             optionsDiv.appendChild(optionInput);
             optionsDiv.appendChild(br);
         }
     </script>
-    <!-- form -->
-    <form action="/create" method="POST">
-        <label for="title">Title</label>
-        <input type="text" name="title" id="title">
-        
-        <select name="category">
-            {% for category in categories %}
-                <option value="{{category}}">{{category}}</option>
-            {% endfor %}
-        </select>
-        <br/>
 
-        <input type="date" name="expires_date">
-        <input type="time" name="expires_time">
-        <br/>
-        
-        <label for="options">Options</label>
-        <br/>
-        
-        <div id="options-div"></div>
-        
-        <input type="button" value="Add Option" onclick="addOption()">
-        <input type="submit" value="Create">
+    <nav>
+        <a href="/create">Create Poll</a>
+        <a href="/search">Search Polls</a>
+        <a href="/users/{{uid}}">My Profile</a>
+        <a href="/logout">Logout</a>
+    </nav>
+    <br/>
+    
+    <!-- form -->
+    <main>
+    <form action="/create" method="POST">
+        <div class="auth-form" id="create-main">
+            <center>
+                <h2>Title and Category</h2>
+            </center>
+            <div class="title-category">
+                <input type="text" name="title" id="title">
+                
+                <select name="category">
+                    {% for category in categories %}
+                        <option value="{{category}}">{{category}}</option>
+                    {% endfor %}
+                </select>
+                <br/>
+            </div>
+
+            <center>
+                <h2>Expiry Date and Time</h2>
+            </center>
+            
+            <div class="time">
+                <input type="date" name="expires_date">
+                <input type="time" name="expires_time">
+                <br/>
+            </div>
+            
+            <center>
+                <h2>Options</h2>
+            </center>
+            
+            <div id="options-div">
+                <input type="text" name="options" class="option">
+                <br/>
+                <input type="text" name="options" class="option">
+                <br/>
+            </div>
+            <input type="button" value="Add Option" class="add-options" onclick="addOption()">
+            <br/>
+            <input type="submit" value="Create Poll">
+        </div>
     </form>
+    </main>
 {% endblock %}

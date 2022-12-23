@@ -3,14 +3,19 @@
 {% block title %}Register{% endblock %}
 
 {% block content %}
-    <h1>Register</h1>
-    <form action="/register" method="post">
-        <label for="username">Username</label>
-        <input type="text" name="username" id="username">
-        <label for="password">Password</label>
-        <input type="password" name="password" id="password">
-        <label for="confirmation">Confirm Password</label>
-        <input type="password" name="confirmation" id="confirmation">
-        <input type="submit" value="Register">
-    </form>
+    <main>
+        <form action="/register" method="post">
+            <div class="auth-form">
+                <center>
+                    <h1>Register</h1>
+                </center>
+                <input class="form-text" type="text" name="username" id="username" placeholder="Username">
+                <input class="form-text" type="password" name="password" id="password" placeholder="Password">
+                <input class="form-text" type="password" name="confirmation" id="confirmation" placeholder="Confirm Password">
+                <input class="form-button" type="submit" value="Register">
+                
+                <a href="/login">Already have an account?</a>
+            </div>
+        </form>
+    </main>
 {% endblock %}

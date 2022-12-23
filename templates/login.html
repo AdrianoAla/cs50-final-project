@@ -3,12 +3,17 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
-    <h1>Login</h1>
-    <form action="/login" method="post">
-        <label for="username">Username</label>
-        <input type="text" name="username" id="username">
-        <label for="password">Password</label>
-        <input type="password" name="password" id="password">
-        <input type="submit" value="Login">
-    </form>
+    <main>
+        <form action="/login" method="post">
+            <div class="auth-form">
+                <center>
+                    <h1>Login</h1>
+                </center>
+                <input class="form-text" type="text" name="username" id="username" placeholder="Username">
+                <input class="form-text" type="password" name="password" id="password" placeholder="Password">
+                <input class="form-button" type="submit" value="Login">
+                <a href="/register">Don't have an account?</a>
+            </div>
+        </form>
+    </main>
 {% endblock %}

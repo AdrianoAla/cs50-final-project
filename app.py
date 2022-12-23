@@ -3,7 +3,7 @@ from flask import session, redirect, render_template, request
 from flask_session import Session
 from tempfile import mkdtemp
 from werkzeug.security import check_password_hash, generate_password_hash
-from helpers import login_required
+from helpers import login_required, calculate_level, xp_until_next_level
 import sqlite3
 from datetime import datetime
 
@@ -30,57 +30,94 @@ def index():
     cursor = connection.cursor()
     uid = session["user_id"]
 
-    username = cursor.execute("SELECT username FROM users WHERE id = ?", (uid,)).fetchall()[0][0]
+    (name, correct_guesses) = cursor.execute("SELECT username, correct_guesses FROM users WHERE id = ?", (uid,)).fetchall()[0]
+    
+    # Get user's level and XP
 
-    polls = cursor.execute("SELECT * FROM polls WHERE creator_id = ?", (uid,)).fetchall()
-    print(polls)
+    xp = correct_guesses*100
+    level = calculate_level(xp)
 
-    return render_template("index.html", name=username, polls=polls)
+    # Get XP until next level
+
+    xp_need = xp_until_next_level(xp)
+    polls_needed = int(xp_need/100)
+
+    # get the users polls
+
+    polls = cursor.execute("SELECT id, question, category FROM polls WHERE creator_id = ?", (uid,)).fetchall()
+
+    # get the users notifications
+
+    notifications = cursor.execute("SELECT poll_id, message FROM notifications WHERE user_id = ? ORDER BY id DESC", (uid,)).fetchall()
+
+
+    return render_template("index.html", name=name, level=level, xp=xp, polls_needed=polls_needed, polls=polls, notifications=notifications, uid=uid)
 
 @app.route("/users/<int:uid>")
 def user(uid):
     
-    # Get user profile
     cursor = connection.cursor()
-    user = cursor.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchall()
-
-    if len(user) != 1:
+    user_id = session.get("user_id")
+    
+    # Get user profile
+    
+    try:
+        [name, completed, participated] = cursor.execute("SELECT username, correct_guesses, polls_participated FROM users WHERE id = ?", (uid,)).fetchall()[0]
+    except IndexError:
         return render_template("error.html", message="User not found")
+    
+    level = calculate_level(completed*100)
+    xp = completed*100
 
     # Get the users polls
-    polls = cursor.execute("SELECT * FROM polls WHERE creator_id = ?", (uid,)).fetchall()
 
-    return render_template("user.html", user=user[0], polls=polls)
+    polls = cursor.execute("SELECT id, question, category FROM polls WHERE creator_id = ?", (uid,)).fetchall()
+
+    return render_template("user.html", user_id=user_id, name=name, completed=completed, participated=participated, xp=xp , polls=polls, level=level)
 
 @app.route("/search", methods=["GET", "POST"])
 def search():
-    if request.method == "POST":
-        query = request.form.get("query")
-        category = request.form.get("category")
+        query = request.args.get("query")
+        category = request.args.get("category")
 
+        print (query, category)
         cursor = connection.cursor()
         
-        if not query or query == "":
-            polls = cursor.execute("SELECT * FROM polls WHERE category = ?", (category,)).fetchall()
-        
-        else:
-            polls = cursor.execute("SELECT * FROM polls WHERE question LIKE ? AND category = ?", ('%' + query + '%', category)).fetchall()
+        if (not query or query == "") and category:
+            polls = cursor.execute("SELECT id, question, category FROM polls WHERE category = ? ORDER BY id DESC", (category,)).fetchall()
 
-        return render_template("search.html", polls=polls, query=query, categories=categories)
-    else:
-        return render_template("search.html", categories=categories)
+        elif query:
+            polls = cursor.execute("SELECT id, question, category FROM polls WHERE question LIKE ? AND category = ? ORDER BY id DESC", (f'%{query}%', category)).fetchall()
+        else :
+            return render_template("search.html", polls=[], query=query, categories=categories, uid=session.get("user_id"))
+        
+        return render_template("search.html", polls=polls, query=query, categories=categories, uid=session.get("user_id"))
 
 @app.route("/delete/<int:pid>", methods=["POST"])
 @login_required
 def delete(pid):
     cursor = connection.cursor()
-    cid = cursor.execute("SELECT creator_id FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
 
-    if cid != session["user_id"]:
+    # Check user is creator of poll
+
+    creator_id = cursor.execute("SELECT creator_id FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
+
+    if creator_id != session["user_id"]:
         return render_template("error.html", message="You are not the creator of this poll")
+
+    votes = cursor.execute("SELECT user_id FROM poll_votes WHERE poll_id = ?", (pid,)).fetchall()
+    poll_name = cursor.execute("SELECT question FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
+
+    # Delete poll
 
     cursor.execute("DELETE FROM polls WHERE id = ?", (pid,))
     cursor.execute("DELETE FROM poll_options WHERE poll_id = ?", (pid,))
+    
+    # Send notification to all users who participated in the poll
+
+    for vote in votes:
+        cursor.execute("INSERT INTO notifications (user_id, message, poll_id) VALUES (?, ?, ?)", (vote[0], f'Poll "{poll_name}" has been deleted', pid, ))
+
     connection.commit()
 
     return redirect("/")
@@ -88,37 +125,54 @@ def delete(pid):
 @app.route("/end/<int:pid>", methods=["POST"])
 @login_required
 def end(pid):
-
+    
     cursor = connection.cursor()
-    cid = cursor.execute("SELECT creator_id FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
+    win = int(request.form.get("win"))
 
-    if cid != session["user_id"]:
+    # Check user is creator of poll
+
+    creator_id = cursor.execute("SELECT creator_id FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
+
+    if creator_id != session["user_id"]:
         return render_template("error.html", message="You are not the creator of this poll")
 
+    # End poll
+
     cursor.execute("UPDATE polls SET over = 1 WHERE id = ?", (pid,))
+
+    # Get poll votes and poll name
+
+    votes = cursor.execute("SELECT user_id, option_id FROM poll_votes WHERE poll_id = ?", (pid,)).fetchall()
+    poll_name = cursor.execute("SELECT question FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
+
+    # Send notifications to users who voted
+
+    for (user_id, option_id) in votes:
+        cursor.execute("UPDATE users SET polls_participated = correct_guesses + 1 WHERE id = ?", (user_id,))
+        
+        if option_id == win:
+            cursor.execute("UPDATE users SET correct_guesses = correct_guesses + 1 WHERE id = ?", (user_id,))
+            cursor.execute("INSERT INTO notifications (user_id, poll_id, message) VALUES (?, ?, ?)", (user_id, pid, f'Your prediction in poll "{poll_name}" was correct!'))
+        
+        else:
+            cursor.execute("INSERT INTO notifications (user_id, poll_id, message) VALUES (?, ?, ?)", (user_id, pid, f'Your prediction in poll "{poll_name}" was incorrect!'))
+    
     connection.commit()
-
-    votes = cursor.execute("SELECT * FROM poll_votes WHERE poll_id = ?", (pid,)).fetchall()
-    pollname = cursor.execute("SELECT question FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
-
-    for vote in votes:
-        if vote[3] == win:
-            cursor.execute("UPDATE users SET polls_won = polls_won + 1 WHERE id = ?", (vote[2],))
-            cursor.execute("INSERT INTO notifications (user_id, poll_id, message) VALUES (?, ?)", (vote[2], pid, "Your prediction in poll \"" + pollname + "\" was correct!"))
-
     return redirect("/")
 
 @app.route("/poll/<int:pid>", methods=["GET", "POST"])
 def poll(pid):
+    uid = session.get("user_id")
+    
     if request.method == "POST":
         
-        if session.get("user_id") is None:
+        if uid is None:
             return redirect("/login")
 
         option = request.form.get("option")
-        uid = session["user_id"]
 
         # Check for client-side hacks
+        
         if not option:
             return render_template("error.html", message="Please select an option")
         
@@ -126,29 +180,38 @@ def poll(pid):
             return render_template("error.html", message="Please select an option")
 
         # Query database for option
+        
         cursor = connection.cursor()
-        poll_option = cursor.execute("SELECT * FROM poll_options WHERE id = ?", (option,)).fetchall()
-        poll = cursor.execute("SELECT * FROM polls WHERE id = ?", (pid,)).fetchall()
+        option_exists = cursor.execute("SELECT EXISTS(SELECT id FROM poll_options WHERE id = ?)", (option,)).fetchall()
+        
+        # Check if poll exists
 
-        if len(poll_option) != 1:
-            return render_template("error.html", message="Option not found")
+        try:
+            (expires, over) = cursor.execute("SELECT expires, over FROM polls WHERE id = ?", (pid,)).fetchall()[0]
+        except IndexError:
+            return render_template("error.html", message="Poll does not exist")
 
         # Check if poll is still open
-        if poll[0][4] < datetime.now().timestamp() or poll[0][5] == 1:
-            return render_template("error.html", message="Poll is closed")
         
-        # Get poll id
-        pid = poll_option[0][1]
+        if expires < datetime.now().timestamp() or over == 1:
+            return render_template("error.html", message="Poll is closed")
+
+        # Check user is not creator of poll
+
+        creator_id = cursor.execute("SELECT creator_id FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
+        if creator_id == uid:
+            return render_template("error.html", message="You are the creator of this poll")
 
         # Check if user has already voted
-        user_vote = cursor.execute("SELECT * FROM poll_votes WHERE user_id = ? AND poll_id = ?", (uid, pid)).fetchall()
 
-        if len(user_vote) > 0:
+        voted = cursor.execute("SELECT EXISTS(SELECT id FROM poll_votes WHERE user_id = ? AND poll_id = ?)", (uid, pid)).fetchall()
+
+        if voted == 0:
             return render_template("error.html", message="You have already voted in this poll")
 
         # Insert prediction into database
+
         cursor.execute("INSERT INTO poll_votes (user_id, option_id, poll_id) VALUES (?, ?, ?)", (uid, option, pid))
-        cursor.execute("UPDATE TABLE users SET polls_participated = polls_participated + 1 WHERE id = ?", (uid,))
         connection.commit()
 
         return redirect("/poll/" + str(pid))
@@ -156,53 +219,66 @@ def poll(pid):
         closed = False
 
         # Query database for poll
-        cursor = connection.cursor()
-        poll = cursor.execute("SELECT * FROM polls WHERE id = ?", (pid,)).fetchall()
         
-        if len(poll) != 1:
-            return render_template("error.html", message="Poll not found")
+        cursor = connection.cursor()
+        
+        # Check if poll exists
+        
+        try:
+            (id, question, category, creator_id, expires, over) = cursor.execute("SELECT id, question, category, creator_id, expires, over FROM polls WHERE id = ?", (pid,)).fetchall()[0]
+        except IndexError:
+            return render_template("error.html", message="Poll not found, it may have been deleted. If not, check the URL and try again.")
         
         # Query database for options
-        options = cursor.execute("SELECT * FROM poll_options WHERE poll_id = ?", (pid,)).fetchall()
+        
+        options = cursor.execute("SELECT id, option_text FROM poll_options WHERE poll_id = ?", (pid,)).fetchall()
 
         # Check if user is the creator of the poll
-        creator = (session.get("user_id") == poll[0][3])
+        
+        creator = (uid == creator_id)
 
         # Get number of votes
+
         votes = cursor.execute("SELECT COUNT(*) FROM poll_votes WHERE poll_id = ?", (pid,)).fetchall()[0][0]
 
-        if poll[0][4] < datetime.now().timestamp() or poll[0][5] == 1:
+        if expires < datetime.now().timestamp() or over == 1:
             closed = True
 
         # See what user has voted
-        if session.get("user_id") is None:
-            voted = None
+
+        if uid is None:
+            vote = None
         else:
-            voted = cursor.execute("SELECT * FROM poll_votes WHERE user_id = ? AND poll_id = ?", (session["user_id"], pid)).fetchall()
-            if len(voted) > 0:
-                voted = voted[0][3]
-            else:
-                voted = None
+            try:
+                vote = cursor.execute("SELECT id FROM poll_votes WHERE user_id = ? AND poll_id = ?", (uid, pid)).fetchall()[0][0]
+            except IndexError:
+                vote = None
         
         
-        return render_template("poll.html", poll=poll[0], options=options, voted=voted, votes=votes, creator=creator, closed=closed)
+        return render_template("poll.html", poll=[id, question, category], options=options, voted=vote, votes=votes, creator=creator, closed=closed)
 
 @app.route("/create", methods=["GET", "POST"])
 @login_required
 def create():
     if request.method == "POST":
+        
         title = request.form.get("title")
-        options = request.form.getlist("options")
         category = request.form.get("category")
+        options = request.form.getlist("options")
         expires_date = request.form.get("expires_date")
         expires_time = request.form.get("expires_time")
 
         #convert date and time to unix timestamp
-        expires = expires_date + " " + expires_time
-        expires = datetime.strptime(expires, "%Y-%m-%d %H:%M")
-        expires = expires.timestamp()
+
+        try:
+            expires = expires_date + " " + expires_time
+            expires = datetime.strptime(expires, "%Y-%m-%d %H:%M")
+            expires = expires.timestamp()
+        except ValueError:
+            return render_template("error.html", message="Please enter a valid date and time")
 
         # Check for client-side hacks
+
         if not title or not options or not category:
             return render_template("error.html", message="Please fill in all fields")
         
@@ -217,14 +293,17 @@ def create():
                 return render_template("error.html", message="Please fill in all fields")
         
         # Insert poll into database
+
         cursor = connection.cursor()
         cursor.execute("INSERT INTO polls (question, category, expires, creator_id) VALUES (?, ?, ?, ?)", (title, category, expires, session["user_id"]))
         connection.commit()
 
         # Get poll id
+        
         pid = cursor.execute("SELECT id FROM polls WHERE question = ?", (title,)).fetchall()[0][0]
 
         # Insert poll options into database
+        
         for option in options:
             cursor.execute("INSERT INTO poll_options (option_text, poll_id) VALUES (?, ?)", (option, pid))
             connection.commit()
@@ -237,8 +316,11 @@ def create():
 def login():
     if request.method == "POST":
 
+        cursor = connection.cursor()
         username = request.form.get("username")
         password = request.form.get("password")
+
+        # Check for client-side hacks
 
         if not username or not password:
             return render_template("error.html", message="Please fill in all fields")
@@ -247,14 +329,20 @@ def login():
             return render_template("error.html", message="Please fill in all fields")
 
         # Query database for username
-        cursor = connection.cursor()
-        rows = cursor.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchall()
         
-        if len(rows) != 1 or not check_password_hash(rows[0][2], password):
+        user_exists = cursor.execute("SELECT EXISTS(SELECT id FROM users WHERE username = ?)", (username,)).fetchall()
+
+        if user_exists[0][0] == 0:
+            return render_template("error.html", message="User does not exist")
+
+        (id, hash) = cursor.execute("SELECT id, password FROM users WHERE username = ?", (username,)).fetchall()[0]
+        
+        if not check_password_hash(hash, password):
             return render_template("error.html", message="Invalid username and/or password")
         
         # Remember which user has logged in
-        session["user_id"] = rows[0][0]
+
+        session["user_id"] = id
 
         return redirect("/")
 
@@ -264,9 +352,12 @@ def login():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
+
         username = request.form.get("username")
         password = request.form.get("password")
         confirmation = request.form.get("confirmation")
+
+        # Check for client-side hacks
 
         if not username or not password or not confirmation:
             return render_template("error.html", message="Please fill in all fields")
@@ -278,13 +369,15 @@ def register():
             return render_template("error.html", message="Passwords do not match")
         
         # Query database for username
+       
         cursor = connection.cursor()
-        rows = cursor.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchall()
+        user_exists = cursor.execute("SELECT EXISTS (SELECT username FROM users WHERE username = ?)", (username,)).fetchall()
 
-        if len(rows) != 0:
+        if user_exists == 1:
             return render_template("error.html", message="Username already exists")
         
         # Insert user into database
+       
         cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, generate_password_hash(password)))
         connection.commit()
 

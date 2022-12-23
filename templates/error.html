@@ -3,5 +3,12 @@
 {% block title %}Error{% endblock %}
 
 {% block content %}
-    <center>{{message}}</center>
+    <main>
+        <img src="/static/error.svg" alt="Error" width="500px" height="500px">
+        <center>
+            <h1>Error!</h1>
+            <p>{{message}}</p>
+            <p><a href="/">Back to homepage.</a></p>
+        </center>
+    </main>
 {% endblock %}

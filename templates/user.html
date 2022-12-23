@@ -1,23 +1,48 @@
 {% extends "layout.html" %}
 
-{% block title %} User {% endblock %}
+{% block title %} {{name}} {% endblock %}
 
-{% block content %} 
-    <h1>{{user[1]}}</h1>
-    <p>XP: {{user[3]}}</p>
-    {% if user[5] == 0 %}
-    
-        <p>User has never participated in a poll</p>
+{% block content %}
+    <nav>
+        <a href="/create">Create Poll</a>
+        <a href="/search">Search Polls</a>
+        {% if user_id %}
+            <a href="/users/{{user_id}}">My Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+        {% endif %}
+    </nav>
 
-    {% else %}
-    
-        <p>Correct Rate: {{user[4]/user[5]}}</p>
-    
-    {% endif %}
+    <main>
+        <h1>{{name}} (Level {{level}})</h1>
+        <p>XP: {{completed*100}}</p>
+        {% if participated == 0 %}
+        
+            <p>User has never participated in a poll</p>
 
-    {% for poll in polls %}
-        <div class="poll">
-            <h2><a href="/poll/{{poll[0]}}">{{poll[1]}} | {{poll[2]}}</a></h2>
-        </div>
-    {% endfor %}
+        {% else %}
+        
+            <p>Correct Rate: {{completed/participated*100}}%</p>
+        
+        {% endif %}
+
+        <h2>Polls by {{name}}</h2>
+        
+        {% if polls == [] %}
+            <p>User has not created any polls</p>
+        {% endif %}
+
+        {% for poll in polls %}
+            <div class="poll">
+                <h2 class="poll-title">
+                    <a href="/poll/{{poll[0]}}">
+                        {{poll[1]}}
+                    </a>
+                </h2>
+                <h3 class="poll-category">{{poll[2]}}</h3>
+            </div>
+        {% endfor %}
+    </main>
 {% endblock %}

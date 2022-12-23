@@ -1,44 +1,48 @@
 {% extends "layout.html" %}
 
-{% block title %} Poll {% endblock %}
+{% block title %} {{poll[1]}} {% endblock %}
 
 {% block content %}
-    <h1>{{poll[1]}} | {{votes}}</h1>
-    <p>{{poll[2]}}</p>
-    {% if closed %}
-        <p>Poll is closed.</p>
-    {% else %}
-        <form action="/poll/{{poll[0]}}" method="POST">
-            
-            {% if voted == None %}
-            <select name="option" >
-                {% for option in options %}
-                    <option value="{{option[0]}}">{{option[2]}}</option><br/>
-                {% endfor %}
-            </select>
-            <input type="submit" value="Vote">
-            {% else %}
-                {% for option in options %}
-                
-                    {% if option[0] == voted %}
-                        <h2>Already voted for {{option[2]}}</h2>
-                    {% endif %}
+    <main>
+        <div class="poll-display">
+            <h1>{{poll[1]}} ({{poll[2]}})</h1>
+            <p>{{votes}} vote{% if votes != 1 %}s{% endif %}</p>
 
-                {% endfor %}
+            {% if closed %}
+                <h2>Poll is closed.</h2>
+            {% else %}
+                <form action="/poll/{{poll[0]}}" method="POST">
+                    
+                    {% if voted == None %}
+                    <select name="option" >
+                        {% for option in options %}
+                            <option value="{{option[0]}}">{{option[1]}}</option><br/>
+                        {% endfor %}
+                    </select>
+                    <input type="submit" value="Vote">
+                    {% else %}
+                        <h2>Already voted!</h2> 
+                    {% endif %}
+                </form>
             {% endif %}
-        </form>
-    {% endif %}
-    {% if creator and not closed %}
-        <form action="/delete/{{poll[0]}}" method="POST">
-            <input type="submit" value="Delete">
-        </form>
-        <form action="/end/{{poll[0]}}" method="POST">
-            <select name="win" >
-                {% for option in options %}
-                    <option value="{{option[0]}}">{{option[2]}}</option><br/>
-                {% endfor %}
-            </select>
-            <input type="submit" value="End">
-        </form>
-    {% endif %}
+        </div>
+        {% if creator %}
+                <div class="admin-controls">
+                    <h2>Creator Controls</h2>
+                    {% if not closed %}
+                    <form action="/end/{{poll[0]}}" method="POST">
+                        <select name="win" >
+                            {% for option in options %}
+                                <option value="{{option[0]}}">{{option[1]}}</option><br/>
+                            {% endfor %}
+                        </select>
+                        <input type="submit" value="End">
+                    </form>
+                    {% endif %}
+                    <form action="/delete/{{poll[0]}}" method="POST">
+                        <input type="submit" value="Delete">
+                    </form>
+                </div>
+            {% endif %}
+    </main>
 {% endblock %}

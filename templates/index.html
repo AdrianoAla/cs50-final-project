@@ -3,11 +3,52 @@
 {% block title %} Home {% endblock %}
 
 {% block content %}
-    <h1>Home</h1>
-    <p>Welcome to the home page, {{name}}.</p>
-    {% for poll in polls %}
-        <div class="poll">
-            <h2><a href="/poll/{{poll[0]}}">{{poll[1]}} | {{poll[2]}}</a></h2>
-        </div>
-    {% endfor %}
+
+    <nav>
+        <a href="/create">Create Poll</a>
+        <a href="/search">Search Polls</a>
+        <a href="/users/{{uid}}">My Profile</a>
+        <a href="/logout">Logout</a>
+    </nav>
+
+    <main>
+
+        <h1>{{name}} (Level {{level}})</h1>
+        <p>Correctly get {{polls_needed}} prediction{% if polls_needed > 1 %}s{% endif %} to level up!</p>
+        
+        <h1>Your Predictables</h1>
+
+        {% if polls == [] %}
+            <p>You have no predictables. <a href="/create">Click here</a> to create one</p>
+        {% endif %}
+
+        {% for poll in polls %}
+            <div class="poll">
+                <h2 class="poll-title">
+                    <a href="/poll/{{poll[0]}}">
+                        {{poll[1]}}
+                    </a>
+                </h2>
+                <h3 class="poll-category">{{poll[2]}}</h3>
+            </div>
+        {% endfor %}
+
+        
+
+        <h1>Inbox</h1>
+        {% if notifications == [] %}
+            <p>You have no notifications. <a href="/search">Click here</a> to search and find some polls to vote on!</p>
+        {% endif %}
+
+        {% for notification in notifications %}
+            <div class="notification">
+                <h2 class="notification-text">
+                    <a href="/poll/{{notification[0]}}">
+                        {{notification[1]}}
+                    </a>
+                </h2>
+            </div>
+        {% endfor %}
+    </main>
+
 {% endblock %}
