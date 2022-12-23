@@ -88,7 +88,6 @@ def delete(pid):
 @app.route("/end/<int:pid>", methods=["POST"])
 @login_required
 def end(pid):
-    win = request.form.get("win")
 
     cursor = connection.cursor()
     cid = cursor.execute("SELECT creator_id FROM polls WHERE id = ?", (pid,)).fetchall()[0][0]
