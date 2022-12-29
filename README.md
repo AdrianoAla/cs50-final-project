@@ -1,5 +1,7 @@
 # This or That? [Video](https://youtu.be/VLUHXXl5t_I)
 
+I finished the CS50x with this project!! Got 100% on it too!
+
 # Project Description
 
 "This or That?" is a web app built with Flask that allows users to create polls to predict events, whether they be sporting events, political events, or predicting trends in the entertainment and tech industry, you can vote on anything! The app uses an SQLite3 database, which we learned how to use in the course, to store user accounts, polls and their options, votes, and notifications.
